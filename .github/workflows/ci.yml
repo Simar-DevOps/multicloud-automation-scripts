@@ -25,12 +25,12 @@ jobs:
           Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
           Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning -ReportSummary
 
-      - name: Dry-run AWS EC2 script
+      - name: Dry-run AWS EC2 script (argument parsing only)
         shell: pwsh
         run: |
-          pwsh ./aws/ec2_start_stop.ps1 -Action Start -TagKey Role -TagValue Web -Region us-east-1 -DryRun
+          pwsh -NoProfile -File ./aws/ec2_start_stop.ps1 -Action Start -TagKey Role -TagValue Web -Region us-east-1 -DryRun
 
-      - name: Dry-run Azure VM script
+      - name: Dry-run Azure VM script (argument parsing only)
         shell: pwsh
         run: |
-          pwsh ./azure/vm_start_stop.ps1 -Action Stop -TagName Role -TagValue Web -ResourceGroup rg-sandbox -DryRun
+          pwsh -NoProfile -File ./azure/vm_start_stop.ps1 -Action Stop -TagName Role -TagValue Web -ResourceGroup rg-sandbox -DryRun
