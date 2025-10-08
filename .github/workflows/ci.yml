@@ -10,13 +10,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show script header (debug)
+      - name: Show AWS script header (debug)
         shell: pwsh
         run: |
-          Write-Host "=== ec2_start_stop.ps1 (first 40 lines) ==="
+          Write-Host "=== aws/ec2_start_stop.ps1 (first 40 lines) ==="
           Get-Content ./aws/ec2_start_stop.ps1 -TotalCount 40
           Write-Host "=== PowerShell version ==="
           $PSVersionTable
+
+      - name: Show Azure script header (debug)
+        shell: pwsh
+        run: |
+          Write-Host "=== azure/vm_start_stop.ps1 (first 40 lines) ==="
+          Get-Content ./azure/vm_start_stop.ps1 -TotalCount 40
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
