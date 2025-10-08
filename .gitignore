@@ -1,0 +1,16 @@
+﻿# General
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Env & creds
+.env
+*.env
+*.secrets
+*.key
+
+# Python/Node noise (in case future helpers use them)
+__pycache__/
+node_modules/
