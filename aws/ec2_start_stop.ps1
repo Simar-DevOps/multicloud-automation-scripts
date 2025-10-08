@@ -17,36 +17,44 @@ $HelperPath = Join-Path (Join-Path $ScriptDir '..') 'common\helpers.ps1'
 Require-Tool aws
 Load-DotEnv
 
-$profileArg = if ($Profile) { "--profile $Profile" } else { "" }
+# Build aws args WITHOUT string interpolation
+$awsArgs = @('ec2','describe-instances','--region',$Region)
+if ($Profile) { $awsArgs += @('--profile',$Profile) }
+# Filters and query as separate args (no "$" next to ":" anywhere)
+$awsArgs += @(
+  '--filters', ("Name=tag:{0},Values:{1}" -f $TagKey,$TagValue),
+  '--query',   "Reservations[].Instances[].{Id:InstanceId,State:State.Name}",
+  '--output',  'json'
+)
 
 Write-Log INFO ("Finding EC2 instances with tag {0}={1} in {2}" -f $TagKey,$TagValue,$Region)
 
-$filter     = ("Name=tag:{0},Values:{1}" -f $TagKey,$TagValue)
-# Escape curly braces in the JMESPath projection used by -f by doubling them
-$jmesQuery  = "Reservations[].Instances[].{{Id:InstanceId,State:State.Name}}"
-$describeCmd = ("aws ec2 describe-instances --region {0} {1} --filters {2} --query '{3}' --output json" -f $Region,$profileArg,$filter,$jmesQuery)
-
-$json = Invoke-CLI -Command $describeCmd -DryRun:$DryRun
-
-$instances = @()
-if (-not $DryRun) {
-    $instances = $json | ConvertFrom-Json
-}
-
+# Dry-run just shows what we'd call
 if ($DryRun) {
-    Write-Log INFO ("Would query and then {0} instances matching the tag." -f $Action)
+    Write-Log INFO ("DRY-RUN: aws {0}" -f ($awsArgs -join ' '))
     exit 0
 }
+
+# Execute and parse
+$json = & aws @awsArgs 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Log ERROR "aws describe-instances failed"
+    throw $json
+}
+
+$instances = @()
+if ($json) { $instances = $json | ConvertFrom-Json }
 
 if (-not $instances -or $instances.Count -eq 0) {
     Write-Log WARN "No instances matched."
     exit 0
 }
 
+# Filter eligible states
 $targetIds = @()
 foreach ($i in $instances) {
-    if ($Action -eq "Start" -and $i.State -eq "stopped") { $targetIds += $i.Id }
-    if ($Action -eq "Stop"  -and $i.State -eq "running") { $targetIds += $i.Id }
+    if ($Action -eq 'Start' -and $i.State -eq 'stopped') { $targetIds += $i.Id }
+    if ($Action -eq 'Stop'  -and $i.State -eq 'running') { $targetIds += $i.Id }
 }
 
 if ($targetIds.Count -eq 0) {
@@ -57,11 +65,17 @@ if ($targetIds.Count -eq 0) {
 $joined = ($targetIds -join ' ')
 Write-Log INFO ("{0} -> {1}" -f $Action, $joined)
 
-$cmd = if ($Action -eq "Start") {
-    ("aws ec2 start-instances --instance-ids {0} --region {1} {2}" -f $joined,$Region,$profileArg)
+# Build start/stop args as arrays too
+if ($Action -eq 'Start') {
+    $startArgs = @('ec2','start-instances','--instance-ids') + $targetIds + @('--region',$Region)
+    if ($Profile) { $startArgs += @('--profile',$Profile) }
+    Write-Log INFO ("Executing: aws {0}" -f ($startArgs -join ' '))
+    & aws @startArgs | Out-Null
 } else {
-    ("aws ec2 stop-instances --instance-ids {0} --region {1} {2}" -f $joined,$Region,$profileArg)
+    $stopArgs = @('ec2','stop-instances','--instance-ids') + $targetIds + @('--region',$Region)
+    if ($Profile) { $stopArgs += @('--profile',$Profile) }
+    Write-Log INFO ("Executing: aws {0}" -f ($stopArgs -join ' '))
+    & aws @stopArgs | Out-Null
 }
-Invoke-CLI -Command $cmd -DryRun:$DryRun | Out-Null
 
-Write-Log INFO "Done."
+Write-Log INFO 'Done.'
