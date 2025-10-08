@@ -8,16 +8,19 @@
 )
 
 $ErrorActionPreference = "Stop"
-. "$PSScriptRoot/../common/helpers.ps1"
+
+$ScriptDir  = Split-Path -Parent $PSCommandPath
+$HelperPath = Join-Path (Join-Path $ScriptDir '..') 'common\helpers.ps1'
+. $HelperPath
 
 Require-Tool aws
 Load-DotEnv
 
-$profileArg = ($Profile) ? "--profile $Profile" : ""
+$profileArg = ($Profile) ? "--profile ${Profile}" : ""
 
-Write-Log INFO "Finding EC2 instances with tag $TagKey=$TagValue in $Region"
+Write-Log INFO "Finding EC2 instances with tag ${TagKey}=${TagValue} in ${Region}"
 
-$describeCmd = "aws ec2 describe-instances --region $Region $profileArg --filters Name=tag:$TagKey,Values=$TagValue --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name}' --output json"
+$describeCmd = "aws ec2 describe-instances --region ${Region} ${profileArg} --filters Name=tag:${TagKey},Values=${TagValue} --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name}' --output json"
 $json = Invoke-CLI -Command $describeCmd -DryRun:$DryRun
 
 $instances = @()
@@ -26,7 +29,7 @@ if (-not $DryRun) {
 }
 
 if ($DryRun) {
-    Write-Log INFO "Would query and then $Action instances matching the tag."
+    Write-Log INFO "Would query and then ${Action} instances matching the tag."
     exit 0
 }
 
@@ -35,7 +38,6 @@ if (-not $instances -or $instances.Count -eq 0) {
     exit 0
 }
 
-# Filter eligible states
 $targetIds = @()
 foreach ($i in $instances) {
     if ($Action -eq "Start" -and $i.State -eq "stopped") { $targetIds += $i.Id }
@@ -43,17 +45,17 @@ foreach ($i in $instances) {
 }
 
 if ($targetIds.Count -eq 0) {
-    Write-Log WARN "Nothing to $Action (instances already in desired state)."
+    Write-Log WARN "Nothing to ${Action} (instances already in desired state)."
     exit 0
 }
 
 $joined = ($targetIds -join ' ')
-Write-Log INFO "$Action -> $joined"
+Write-Log INFO "${Action} -> $joined"
 
 $cmd = if ($Action -eq "Start") {
-    "aws ec2 start-instances --instance-ids $joined --region $Region $profileArg"
+    "aws ec2 start-instances --instance-ids $joined --region ${Region} ${profileArg}"
 } else {
-    "aws ec2 stop-instances --instance-ids $joined --region $Region $profileArg"
+    "aws ec2 stop-instances --instance-ids $joined --region ${Region} ${profileArg}"
 }
 Invoke-CLI -Command $cmd -DryRun:$DryRun | Out-Null
 

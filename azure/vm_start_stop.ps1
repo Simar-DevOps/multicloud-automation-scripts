@@ -7,15 +7,18 @@
 )
 
 $ErrorActionPreference = "Stop"
-. "$PSScriptRoot/../common/helpers.ps1"
+
+$ScriptDir  = Split-Path -Parent $PSCommandPath
+$HelperPath = Join-Path (Join-Path $ScriptDir '..') 'common\helpers.ps1'
+. $HelperPath
 
 Require-Tool az
 Load-DotEnv
 
-Write-Log INFO "Finding Azure VMs with tag $TagName=$TagValue $(if($ResourceGroup){"in RG $ResourceGroup"})"
+Write-Log INFO "Finding Azure VMs with tag ${TagName}=${TagValue} $(if($ResourceGroup){"in RG ${ResourceGroup}"})"
 
-$rgArg = ($ResourceGroup) ? "--resource-group $ResourceGroup" : ""
-$listCmd = "az vm list $rgArg --show-details --query ""[?tags.$TagName=='$TagValue'].{id:id,power:powerState,name:name}"" -o json"
+$rgArg = ($ResourceGroup) ? "--resource-group ${ResourceGroup}" : ""
+$listCmd = "az vm list ${rgArg} --show-details --query ""[?tags.${TagName}=='${TagValue}'].{id:id,power:powerState,name:name}"" -o json"
 $json = Invoke-CLI -Command $listCmd -DryRun:$DryRun
 
 $vms = @()
@@ -24,7 +27,7 @@ if (-not $DryRun) {
 }
 
 if ($DryRun) {
-    Write-Log INFO "Would query and then $Action matching VMs."
+    Write-Log INFO "Would query and then ${Action} matching VMs."
     exit 0
 }
 
@@ -40,12 +43,12 @@ foreach ($vm in $vms) {
 }
 
 if ($targets.Count -eq 0) {
-    Write-Log WARN "Nothing to $Action (VMs already in desired state)."
+    Write-Log WARN "Nothing to ${Action} (VMs already in desired state)."
     exit 0
 }
 
 $ids = $targets -join ' '
-Write-Log INFO "$Action -> $ids"
+Write-Log INFO "${Action} -> $ids"
 
 $cmd = if ($Action -eq "Start") {
     "az vm start --ids $ids"
