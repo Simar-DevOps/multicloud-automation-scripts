@@ -10,19 +10,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Show script header (debug)
+        shell: pwsh
+        run: |
+          Write-Host "=== ec2_start_stop.ps1 (first 40 lines) ==="
+          Get-Content ./aws/ec2_start_stop.ps1 -TotalCount 40
+          Write-Host "=== PowerShell version ==="
+          $PSVersionTable
+
       - name: Install PSScriptAnalyzer
         shell: pwsh
         run: |
-          Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
           Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning -ReportSummary
 
-      - name: Dry-run AWS EC2 script (argument parsing only)
+      - name: Dry-run AWS EC2 script
         shell: pwsh
         run: |
           pwsh ./aws/ec2_start_stop.ps1 -Action Start -TagKey Role -TagValue Web -Region us-east-1 -DryRun
 
-      - name: Dry-run Azure VM script (argument parsing only)
+      - name: Dry-run Azure VM script
         shell: pwsh
         run: |
           pwsh ./azure/vm_start_stop.ps1 -Action Stop -TagName Role -TagValue Web -ResourceGroup rg-sandbox -DryRun
